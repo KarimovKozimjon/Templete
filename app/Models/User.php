@@ -1,10 +1,10 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
@@ -16,7 +16,8 @@ class User extends Authenticatable
         'email',
         'password',
         'avatar',
-        'username'
+        'username',
+        'verification_token', // verification_token ustunini qo'shamiz
     ];
 
     protected $hidden = [
@@ -29,6 +30,21 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
+    // Emailni tasdiqlash
+    public function markEmailAsVerifiedManually()
+    {
+        $this->email_verified_at = now();  // Emailni tasdiqlash
+        $this->verification_token = null;  // Tokenni o'chirish
+        $this->save();
+    }
+
+    // Email tasdiqlanganligini tekshirish
+    public function hasVerifiedEmail()
+    {
+        return !is_null($this->email_verified_at);  // Agar email tasdiqlangan bo'lsa true qaytaradi
+    }
+
+    // Boshqa metodlar
     public function posts()
     {
         return $this->hasMany(Post::class);

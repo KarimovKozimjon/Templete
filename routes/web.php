@@ -8,6 +8,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\NotificationController;
 
+Route::get('/verify-email/{token}', [AuthController::class, 'verifyEmail'])->name('verify.email');
 Route::get('/', function () {
     return view('welcome');
 })->name("home");

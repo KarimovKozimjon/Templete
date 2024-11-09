@@ -34,7 +34,7 @@ class CommentController extends Controller
         $comment = Comment::findOrFail($id);
 
         // O'chirish uchun faqat izoh egasi ruxsat berilgan bo'lishi kerak
-        if ($comment->user_id !== auth()->id()) {
+        if ($comment->user_id !== Auth::id()) {
             return redirect()->back()->with('error', 'Siz bu izohni o\'chira olmaysiz.');
         }
 

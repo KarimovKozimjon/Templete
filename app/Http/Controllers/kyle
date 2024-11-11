@@ -1,3 +1,100 @@
+PostController
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Post;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Requests\StorePostRequest;
+use Illuminate\Support\Facades\Storage;
+use App\Http\Requests\UpdatePostRequest;
+use Notification;
+
+class PostController extends Controller
+{
+    public function createPostForm()
+    {
+        return view("posts.create");
+    }
+
+    public function createPost(StorePostRequest $request)
+    {
+        // Foydalanuvchini tekshirish
+        if (!Auth::check()) {
+            return redirect()->route('login')->with('error', 'Iltimos, tizimga kiring.');
+        }
+
+        // Rasmni yuklash
+        $imagePath = $request->file('image')->store('images', 'public');
+
+        // Yangi post yaratish
+        Post::create([
+            'title' => $request->input('title'),
+            'description' => $request->input('description'),
+            'image' => $imagePath,
+            'user_id' => Auth::id()
+        ]);
+
+        return redirect()->route('profile.show')->with('success', 'Post yaratildi!');
+    }
+
+    public function showProfile()
+    {
+        $myposts = Post::where('user_id', Auth::id())->get(); // Faqat o'z postlarini olish
+        return view('profile.show', compact('myposts'));
+    }
+
+    public function show(Post $post)
+    {
+        return view('posts.show', compact('post'));
+    }
+
+    public function edit(Post $post)
+    {
+        return view('posts.edit', compact('post'));
+    }
+
+    public function update(UpdatePostRequest $request, Post $post)
+    {
+        // Postni yangilash
+        $post->title = $request->input('title');
+        $post->description = $request->input('description');
+
+        // Agar yangi rasm yuklangan bo'lsa, uni saqlash
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('images', 'public');
+            $post->image = $imagePath;
+        }
+
+        $post->save();
+
+        return redirect()->route('posts.show', $post)->with('success', 'Post muvaffaqiyatli yangilandi.');
+    }
+
+    public function destroy(Post $post)
+    {
+        // Check if the post has an image and delete it if it exists
+        if ($post->image) {
+            Storage::delete($post->image);
+        }
+
+        // Delete the post
+        $post->delete();
+
+        return redirect()->route('profile.show')->with('success', 'Post muvaffaqiyatli o\'chirildi.');
+    }
+
+
+    public function index()
+    {
+        $allposts = Post::with('user')->get(); // Barcha postlarni olish
+        return view('posts.all', compact('allposts'));
+    }
+}
+
+
+Profile_header
 <!-- Navbar -->
 <nav class="bg-white shadow-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -36,29 +133,17 @@
 
                     <!-- Bildirishnomalar Dropdowni -->
                     <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5" id="notifications-dropdown" role="menu" aria-orientation="vertical" aria-labelledby="notifications-menu">
-                        <!-- Kuzatuvchi bildirishnomalari -->
-                        @foreach (auth()->user()->notifications as $notification)
-                        @if (isset($notification->data['follower_name']))
+                        @forelse (auth()->user()->notifications as $notification)
                         <a href="{{ route('user.profile', ['id' => $notification->data['follower_id']]) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
-                            Sizda yangi kuzatuvchi ismi {{ $notification->data['follower_name'] }}
+                                
+                            sizda yangi kuzatuvchi ismi {{ $notification->data['follower_name'] }}
+                            <a href="{{ route('user.profile', ['id' => $notification->data['follower_id']]) }}">
+                            </a>
                         </a>
-                        @endif
-                        @endforeach
-
-                        <!-- Postga izoh bildirishnomalari -->
-                        @foreach (auth()->user()->notifications as $notification)
-                        @if (isset($notification->data['post_id']))
-                        <a href="{{ route('posts.show', $notification->data['post_id']) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
-                            {{ $notification->data['message'] }} - {{ $notification->data['post_title'] }}
-                        </a>
-                        @endif
-                        @endforeach
-
-                        @if (auth()->user()->notifications->isEmpty())
+                        @empty
                         <p class="block px-4 py-2 text-sm text-gray-700">Hozircha hech qanday bildirishnoma yo'q.</p>
-                        @endif
+                        @endforelse
                     </div>
-
 
                 </div>
 
@@ -161,3 +246,84 @@
         </div>
     </div>
 </nav>
+
+Post
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Post extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        "user_id",
+        "title",
+        "description",
+        "image"
+    ];
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
+    public function user()
+    {
+        return $this->belongsTo(User::class); // User modeli joylashgan joyga qarab nomini o'zgartiring
+    }
+}
+
+CommentController
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Post;
+use App\Models\Comment;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Requests\CommentRequest;
+
+class CommentController extends Controller
+{
+    public function index($postId)
+    {
+        $post = Post::findOrFail($postId);
+        return view('posts.show', compact('post'));
+    }
+
+    public function store(CommentRequest $request, $postId)
+    {
+        $post = Post::findOrFail($postId);
+    
+        // Izoh qo'shish
+        $post->comments()->create([
+            "content" => $request->comment,
+            "user_id" => Auth::id(),
+        ]);
+    
+        return redirect()->route('posts.show', $postId)->with('success', 'Izoh muvaffaqiyatli qo\'shildi.');
+    }
+
+    public function destroy($id)
+    {
+        $comment = Comment::findOrFail($id);
+
+        // O'chirish uchun faqat izoh egasi ruxsat berilgan bo'lishi kerak
+        if ($comment->user_id !== Auth::id()) {
+            return redirect()->back()->with('error', 'Siz bu izohni o\'chira olmaysiz.');
+        }
+
+        $comment->delete();
+        return redirect()->back()->with('success', 'Izoh muvaffaqiyatli o\'chirildi.');
+    }
+}
+
+
+
+
+endi esa hudda usha Notification ga qoshoamiz yana narsa agar biror user birning bosga komment yozsa habar kelsin va habar bosilganda aynan osha post korinsin

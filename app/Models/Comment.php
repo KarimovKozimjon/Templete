@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Notifications\CommentCreatedNotification;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Comment extends Model
 {
@@ -19,5 +20,15 @@ class Comment extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    // Yangi sharh qo'shilganda bildirishnoma yuborish
+    protected static function booted()
+    {
+        static::created(function ($comment) {
+            // Postni olamiz va uning muallifiga bildirishnoma yuboramiz
+            $post = $comment->post;
+            $post->user->notify(new CommentCreatedNotification($comment, $post));
+        });
     }
 }

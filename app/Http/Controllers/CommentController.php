@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Post;
@@ -7,6 +6,7 @@ use App\Models\Comment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Requests\CommentRequest;
+use App\Notifications\CommentCreatedNotification;
 
 class CommentController extends Controller
 {
@@ -17,17 +17,22 @@ class CommentController extends Controller
     }
 
     public function store(CommentRequest $request, $postId)
-    {
-        $post = Post::findOrFail($postId);
-    
-        // Izoh qo'shish
-        $post->comments()->create([
-            "content" => $request->comment,
-            "user_id" => Auth::id(),
-        ]);
-    
-        return redirect()->route('posts.show', $postId)->with('success', 'Izoh muvaffaqiyatli qo\'shildi.');
-    }
+{
+    $post = Post::findOrFail($postId);
+
+    // Izoh qo'shish
+    $comment = $post->comments()->create([
+        "content" => $request->comment,
+        "user_id" => Auth::id(),
+    ]);
+
+    // Post egasiga yangi izoh haqida xabar yuborish
+    $postOwner = $post->user;
+    $postOwner->notify(new CommentCreatedNotification($post, $comment));
+
+    return redirect()->route('posts.show', $postId)->with('success', 'Izoh muvaffaqiyatli qo\'shildi.');
+}
+
 
     public function destroy($id)
     {

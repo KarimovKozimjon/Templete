@@ -1,10 +1,11 @@
 <?php
+
 namespace App\Models;
 
+use App\Notifications\NewFollowerNotification;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
@@ -56,21 +57,28 @@ class User extends Authenticatable
     }
 
     // Kuzatadigan foydalanuvchilar
-    public function followers()
-    {
-        return $this->belongsToMany(User::class, 'follows', 'followed_id', 'follower_id');
-    }
+// User modelida
 
-    // Kuzatiladigan foydalanuvchilar
-    public function following()
-    {
-        return $this->belongsToMany(User::class, 'follows', 'follower_id', 'followed_id');
-    }
+// User Modelidagi methodlar
+public function followers()
+{
+    return $this->belongsToMany(User::class, 'follows', 'followed_id', 'follower_id');
+}
 
-    // Kuzatish metodlari
+public function following()
+{
+    return $this->belongsToMany(User::class, 'follows', 'follower_id', 'followed_id');
+}
+
+    
+
+    // Follow qilish va notification yuborish
     public function follow(User $user)
     {
-        return $this->following()->attach($user->id);
+        if (!$this->isFollowing($user)) {
+            $this->following()->attach($user->id);  // Follow aloqasini yaratish
+            $user->notify(new NewFollowerNotification($this)); // Notification yuborish
+        }
     }
 
     public function unfollow(User $user)
